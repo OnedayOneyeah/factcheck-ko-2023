@@ -1,0 +1,8 @@
+data/models
+ss/checkpoints*
+rte/checkpoints*
+*.json
+*.pth
+*.pickle
+
+__pycache__/

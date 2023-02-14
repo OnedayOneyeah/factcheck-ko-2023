@@ -1,0 +1,11 @@
+numpy==1.19.5
+pandas==1.2.0
+konlpy==0.5.2
+wikipedia==1.4.0
+beautifulsoup4==4.6.0
+torch
+transformers==4.9.2
+ipython==7.25.0
+tweepy==3.10.0
+openpyxl==3.0.9
+pytorch-pretrained-bert==0.6.2
