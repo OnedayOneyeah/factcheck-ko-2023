@@ -3,7 +3,7 @@ pandas==1.2.0
 konlpy==0.5.2
 wikipedia==1.4.0
 beautifulsoup4==4.6.0
-torch
+torch==1.7.1
 transformers==4.9.2
 ipython==7.25.0
 tweepy==3.10.0
