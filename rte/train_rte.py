@@ -140,7 +140,7 @@ def get_dataset(args, split):
     return examples
 
 
-def convert_dataset(examples, tokenizer, max_length, split, predict=False, display_examples=False):
+def convert_dataset(args, examples, tokenizer, max_length, split, predict=False, display_examples=False):
     """
     Convert train examples into BERT's input foramt.
     """
@@ -148,6 +148,7 @@ def convert_dataset(examples, tokenizer, max_length, split, predict=False, displ
     for ex_idx, example in tqdm(enumerate(examples), total=len(examples)):
         sentence_b = tokenizer.tokenize(example['claim'])
         if split != "train":  # "val" or "test"
+            #print('hey')
             per_claim_features = []
         if not predict:
             label = example['label']
@@ -215,7 +216,7 @@ def load_or_make_features(args, tokenizer, split, save=True):
 
     except FileNotFoundError or EOFError:
         dataset = get_dataset(args, split=split)
-        features = convert_dataset(dataset, tokenizer, args.max_length, split=split)
+        features = convert_dataset(args, dataset, tokenizer, args.max_length, split=split)
         if save:
             with open(features_path, "wb") as fp:
                 pickle.dump(features, fp)
@@ -395,7 +396,7 @@ def validate(val_idx_loader, val_features, model, optimizer, scheduler, args):
             doc_losses.append(loss.item())
             doc_logits.append(logits)
 
-        is_correct, pred = calculate_metric(doc_logits, doc_labels.to(args.gpu))
+        is_correct, pred = calculate_metric(args, doc_logits, doc_labels.to(args.gpu))
 
         val_loss += (sum(doc_losses) / len(doc_losses))
         val_acc += is_correct
@@ -444,6 +445,7 @@ def validate(val_idx_loader, val_features, model, optimizer, scheduler, args):
 
         if not args.evaluate and val_acc > args.best_acc:
             args.best_acc = val_acc
+            path = os.path.join(args.checkpoints_dir, "best_ckpt.pth")
             if not args.debug:
                 print(f'===== New Accuracy record! save checkpoint (epoch: {args.epoch + 1})')
                 torch.save({
@@ -452,10 +454,12 @@ def validate(val_idx_loader, val_features, model, optimizer, scheduler, args):
                     'state_dict': model.module.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'scheduler': scheduler.state_dict(),
-                }, os.path.join(args.checkpoints_dir, "best_ckpt.pth"))
+                }, path)
 
 
-def calculate_metric(doc_logits, doc_labels, mode="sum"):
+def calculate_metric(args, doc_logits, doc_labels):
+    mode = args.mode
+
     assert len(set(doc_labels.tolist())) == 1
     label = doc_labels[0]
 
@@ -474,6 +478,16 @@ def calculate_metric(doc_logits, doc_labels, mode="sum"):
                 pred = 1
             else:
                 pred = 2
+
+    elif mode == "inverse_fever":
+        if 2 in pred_for_each_claim:
+            pred = 2
+        else:
+            if 1 in pred_for_each_claim:
+                pred = 1
+            else:
+                pred = 0
+                
     elif mode == "majority_vote":
         # Simple majority vote
         # if draw, priority is Supported (0) > Refuted (1) > NEI (2)
@@ -556,6 +570,10 @@ def main():
                         default="koelectra",
                         type=str,
                         help='"koelectra" if want to use KoElectra model (https://github.com/monologg/KoELECTRA).')
+    parser.add_argument('--mode',
+                        default = "sum",
+                        type = str,
+                        help = "calculate metric mode")
 
     args = parser.parse_args()
 

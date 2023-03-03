@@ -155,45 +155,64 @@ def get_dataset(args, split):
     return examples
 
 
-def convert_dataset(examples, tokenizer, max_length, split, predict=False, display_examples=False):
+def convert_dataset(args, examples, tokenizer, max_length, split, predict=False, display_examples=False):
     """
     Convert train examples into BERT's input foramt.
     """
     features = []
     for ex_idx, example in tqdm(enumerate(examples), total=len(examples)):
         sentence_b = tokenizer.tokenize(example['claim'])
-        if split != "train":  # "val" or "test"
-            per_claim_features = []
+
+        # if split != "train":  # "val" or "test"
+        #     per_claim_features = []
         if not predict:
             label = example['label']
 
-        for idx in range(len(example['evidences'])):
-            ev = example['evidences'][idx]
-            sentence_a = tokenizer.tokenize(ev)
+        ANCHOR
+        #if split == "train" or (split != "train" and args.mps == False):  
 
-            if len(sentence_a) + len(sentence_b) > max_length - 3:  # 3 for [CLS], 2x[SEP]
+        if split != "train" and args.mps:
+            iteration = 1
+        elif split != "train" and args.mps == False:
+            assert True == False, 'This model is optimized to mps task. please add the --mps option.'
+        else:
+            if args.ev_num >= len(example['evidences']):
+                iteration = 1
+            else:
+                iteration = len(example['evidences']) - args.ev_num + 1
+
+        for idx in range(iteration):
+            if split != "train" and args.mps:
+                ev = random.sample(example['evidences'], k = args.ev_num)
+            else:
+                ev = example['evidences'][idx:idx+args.ev_num] #aggregated evidence sentences
+            sentence_a = [tokenizer.tokenize(x) for x in ev]
+            sen_lens = [len(sentence_a[i])+1 for i in range(len(sentence_a))]
+            sentence_a = [y for i, x in enumerate(sentence_a) for y in (x if i==0 else ['[SEP]']+x)]
+
+            if len(sentence_a) + len(sentence_b) > max_length - 3 - (args.ev_num):
                 logger.warning(
                     "The length of the input is longer than max_length! "
                     f"sentence_a: {sentence_a} / sentence_b: {sentence_b}"
                 )
                 # truncate sentence_b to fit in max_length
-                diff = (len(sentence_a) + len(sentence_b)) - (max_length - 3)
+                diff = (len(sentence_a) + len(sentence_b)) - (max_length - 3 - (args.ev_num))
                 sentence_b = sentence_b[:-diff]
 
             tokens = ["[CLS]"] + sentence_a + ["[SEP]"] + sentence_b + ["[SEP]"]
+            #print(tokens)
             input_ids = tokenizer.convert_tokens_to_ids(tokens)
-            segment_ids = [0] * (len(sentence_a) + 2) + [1] * (len(sentence_b) + 1)
+            segment_ids = [0 if i%2 == 0 else 1 for i,x in enumerate(sen_lens) for y in range(x)] +[(len(sen_lens)+1)%2] + [len(sen_lens)%2]*(len(sentence_b)+1)
             mask = [1] * len(input_ids)
 
-            # Zero-padding
             padding = [0] * (max_length - len(input_ids))
             input_ids += padding
             segment_ids += padding
             mask += padding
             assert len(input_ids) == max_length
-            assert len(segment_ids) == max_length
-            assert len(mask) == max_length
-
+            assert len(segment_ids) == max_length, f'{len(segment_ids)},{max_length}'
+            assert len(mask) == max_length, f'{len(mask)}, {max_length}'
+            
             if ex_idx < 3 and display_examples:
                 logger.info(f"========= Train Example {ex_idx + 1} =========")
                 logger.info("tokens: %s" % " ".join([str(x) for x in tokens]))
@@ -205,16 +224,18 @@ def convert_dataset(examples, tokenizer, max_length, split, predict=False, displ
 
             if not predict:
                 feat = {'input_ids': input_ids, 'segment_ids': segment_ids, 'input_mask': mask, 'label': label}
-                if split == "train":
-                    features.append(feat)
-                else:
-                    per_claim_features.append(feat)
+                features.append(feat)
+                # if split == "train":
+                #     features.append(feat)
+                # else:
+                #     per_claim_features.append(feat)
             else:  # predict
                 feat = {'input_ids': input_ids, 'segment_ids': segment_ids, 'input_mask': mask}
-                per_claim_features.append(feat)
+                features.append(feat)
+                # per_claim_features.append(feat)
 
-        if split != "train":
-            features.append(per_claim_features)
+        # if split != "train":
+        #     features.append(per_claim_features)
 
     return features
 
@@ -223,7 +244,9 @@ ANCHOR
 def load_or_make_features(args, tokenizer, split, save=True):
     small = '_small' if args.debug else ''
     exclude = '_nei_excluded' if (args.exclude_nei and split == 'train') else ''
-    features_path = os.path.join(args.temp_dir, f"{split}_features{small}{exclude}.pickle")
+    mps = '_mps' if args.mps else ''
+    ev_num = '_'+str(args.ev_num) if args.mps else ''
+    features_path = os.path.join(args.temp_dir, f"{split}_features{small}{exclude}{mps}{ev_num}.pickle")
 
     try:
         with open(features_path, "rb") as fp:
@@ -232,7 +255,7 @@ def load_or_make_features(args, tokenizer, split, save=True):
 
     except FileNotFoundError or EOFError:
         dataset = get_dataset(args, split=split)
-        features = convert_dataset(dataset, tokenizer, args.max_length, split=split)
+        features = convert_dataset(args, dataset, tokenizer, args.max_length, split=split)
         if save:
             with open(features_path, "wb") as fp:
                 pickle.dump(features, fp)
@@ -242,10 +265,10 @@ def load_or_make_features(args, tokenizer, split, save=True):
 def build_rte_model(args, num_labels=1):
     if args.model == "koelectra":
         return ElectraForSequenceClassification.from_pretrained("monologg/koelectra-base-v3-discriminator",
-                                                                cache_dir=args.cache_dir, num_labels=num_labels)
+                                                                cache_dir=args.cache_dir, num_labels=num_labels, max_length = args.max_length)
     else:
         return BertForSequenceClassification.from_pretrained('bert-base-multilingual-cased',
-                                                             cache_dir=args.cache_dir, num_labels=num_labels)
+                                                             cache_dir=args.cache_dir, num_labels=num_labels, max_length = args.max_length)
 
 
 def main_worker(gpu, train_dataset, val_features, args):
@@ -257,19 +280,28 @@ def main_worker(gpu, train_dataset, val_features, args):
     model = model.to(args.gpu)
     model = DDP(model, device_ids=[args.gpu])
 
+
     val_idx_dataset = TensorDataset(torch.LongTensor(range(len(val_features))))  # number of docs in validation sets
     val_idx_sampler = DistributedSampler(val_idx_dataset, shuffle=True)
     val_idx_loader = DataLoader(
         val_idx_dataset,
         sampler=val_idx_sampler
     )
+    
+    # # TensorDataset, sampler 
+    # ANCHOR
+    # all_input_ids = torch.LongTensor([x['input_ids'] for x in train_features])
+    # all_segment_ids = torch.LongTensor([x['segment_ids'] for x in train_features])
+    # all_input_masks = torch.LongTensor([x['input_mask'] for x in train_features])
+    # all_label = torch.FloatTensor([x['label'] for x in train_features])
+    # train_dataset = TensorDataset(all_input_ids, all_segment_ids, all_input_masks, all_label)
 
     if args.evaluate:
         dist.barrier()
-        if args.exclude_nei:
-            ckpt_path = os.path.join(args.checkpoints_dir, "best_ckpt_nei_excluded.pth")
-        else:
-            ckpt_path = os.path.join(args.checkpoints_dir, "best_ckpt.pth")
+        nei_excluded = '_nei_excluded' if args.exclude_nei else ''
+        mps = '_mps' if args.mps else ''
+        ev_num = '_'+str(args.ev_num) if args.mps else ''
+        ckpt_path = os.path.join(args.checkpoints_dir, f'best_ckpt{nei_excluded}{mps}{ev_num}.pth')
         checkpoint = torch.load(ckpt_path, map_location=f"cuda:{args.gpu}")
         model.module.load_state_dict(checkpoint["state_dict"])
         validate(val_idx_loader, val_features, model, None, None, args)
@@ -384,6 +416,83 @@ def train(train_dataloader, model, optimizer, scheduler, args):
 
 ANCHOR
 def validate(val_idx_loader, val_features, model, optimizer, scheduler, args):
+
+    if args.mps:
+        all_input_ids = torch.LongTensor([x['input_ids'] for x in val_features])
+        all_segment_ids = torch.LongTensor([x['segment_ids'] for x in val_features])
+        all_input_masks = torch.LongTensor([x['input_mask'] for x in val_features])
+        all_label = torch.FloatTensor([x['label'] for x in val_features])
+        val_dataset = TensorDataset(all_input_ids, all_segment_ids, all_input_masks, all_label)
+        val_sampler = DistributedSampler(val_dataset, shuffle = True)
+
+        val_dataloader = DataLoader(
+            val_dataset,
+            sampler = val_sampler,
+            batch_size = args.batchsize
+        )
+
+        ### ==== Review needed ==== ###
+        model.eval()
+        val_loss, val_acc = 0, 0
+        n_claims_each_label = torch.LongTensor([0, 0, 0])  # refuted nei supported
+        n_corrects_each_label = torch.LongTensor([0, 0, 0])
+        n_predicted_each_label = torch.LongTensor([0, 0, 0])
+
+        if args.gpu == 0:
+            print("=== Running validation ===")
+            pbar = tqdm(total=len(val_idx_loader), desc="Iteration")
+
+        doc_losses, doc_logits = [], [] 
+        doc_labels_cat = []
+
+        ### === ###
+
+        for step, batch in enumerate(val_dataloader):
+            batch = tuple(t.to(args.gpu) for t in batch)
+            input_ids, segment_ids, input_mask, labels = batch
+
+            with torch.no_grad():
+                outputs = model(
+                    input_ids,
+                    token_type_ids = segment_ids,
+                    attention_mask = input_mask,
+                    labels = labels
+                )
+
+            loss, logits = outputs.loss, outputs.logits
+            doc_losses.append(loss.item())
+            doc_logits.append(logits)
+
+        doc_labels_cat.extend(labels)
+    
+    # ===== 여기부터는 그대로
+        val_loss += (sum(doc_losses) / len(doc_losses))
+        if args.gpu == 0:
+            pbar.update(1)
+    assert len(set(doc_labels.to(args.gpu).tolist())) == 1
+    # ====
+    # we don't need scores anymore.
+    [y for x in doc_logits for y in x]
+
+    tanh_score = tanh_score = [F.tanh(x).mean().detach().cpu().item() for x in doc_logits]
+
+    is_correct, pred = calculate_metric(args, tanh_score, doc_labels_cat)
+
+    val_acc = len([1 for x in is_correct if x == 1])
+    val_acc /= len(val_idx_loader)
+    val_loss /= len(val_idx_loader)
+
+
+
+
+
+
+
+
+
+    # if args.mps != True, we'll use the original val_idx loader approach
+    # otherwise, we'll 
+
     model.eval()
     val_loss, val_acc = 0, 0
     n_claims_each_label = torch.LongTensor([0, 0, 0])  # refuted nei supported
@@ -397,6 +506,9 @@ def validate(val_idx_loader, val_features, model, optimizer, scheduler, args):
     doc_losses, doc_logits = [], [] 
     doc_labels_cat = []
 
+    doc_features = val_features
+
+    # ===========
     for idx in val_idx_loader:
         idx = idx[0].item()
         doc_features = val_features[idx]
@@ -537,11 +649,11 @@ def main():
                         type=str,
                         help="To get the ss results of NEI data.")
     parser.add_argument("--temp_dir",
-                        default="./new_rte/tmp/",
+                        default="./new_rte_regression/tmp/",
                         type=str,
                         help="The temp dir where the processed data file will be saved.")
     parser.add_argument("--checkpoints_dir",
-                        default="./new_rte/checkpoints/",
+                        default="./new_rte_regression/checkpoints/",
                         type=str,
                         help="Where checkpoints will be stored.")
     parser.add_argument("--cache_dir",
@@ -571,7 +683,7 @@ def main():
                         type=int,
                         help="random seed.")
     parser.add_argument("--max_length",
-                        default=512,
+                        default=800,
                         type=int,
                         help="The maximum total input sequence length after tokenized."
                         "If longer than this, it will be truncated, else will be padded.")
@@ -604,6 +716,14 @@ def main():
                         default = False,
                         action = 'store_true',
                         help = "exclude nei-labeled data from the training dataset")
+    parser.add_argument('---mps',
+                        default = False,
+                        action = 'store_true',
+                        help = "Use datasets integrated with multiple evidences by claim")
+    parser.add_argument('--ev_num',
+                        default = 1,
+                        type = int,
+                        help = "The number of evidence sentences integrated with each claim")
 
     args = parser.parse_args()
 
@@ -613,6 +733,11 @@ def main():
     else:
         args.n_gpu = 1
         args.gpu = 0
+
+    if args.mps and args.ev_num == 1:
+        args.ev_num = 2 # if mps option is on and ev_num is not given, we'll set the default value as 2.
+    if args.ev_num > 5:
+        assert True == False, 'ev_num should be lower than or equal to 5'
 
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                         datefmt='%m/%d/%Y %H:%M:%S',
