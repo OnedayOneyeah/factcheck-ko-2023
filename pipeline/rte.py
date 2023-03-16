@@ -80,7 +80,7 @@ class RecognizeTextualEntailment:
 
         for i in range(iteration): # ss_results: [ss1, ss2, ss3, ... ss5(max)]
             if self.args.rte_pipeline in [1,2]: # mpe
-                evidence = ss_results
+                #evidence = ss_results
                 sentence_a = [self.tokenizer.tokenize(x) for x in ss_results]
                 sen_lens = [len(sentence_a[i])+1 for i in range(len(sentence_a))]
                 sentence_a = [y for i,x in enumerate(sentence_a) for y in (x if i ==0 else ['[SEP]'] + x)]
@@ -91,8 +91,8 @@ class RecognizeTextualEntailment:
                 sentence_a = self.tokenizer.tokenize(evidence)
                 ev_num = 0
 
-            if len(sentence_a) + len(sentence_b) > max_length - 3 - ev_num:
-                diff = (len(sentence_a) + len(sentence_b)) - (max_length - 3 - ev_num)
+            if len(sentence_a) + len(sentence_b) > max_length - 3:
+                diff = (len(sentence_a) + len(sentence_b)) - (max_length - 3)
                 if self.args.rte_pipeline in [1,2]: # mpe
                     ptr = 1
                     # locate
@@ -100,7 +100,7 @@ class RecognizeTextualEntailment:
                         ptr += 1    
                     # pop, if necessary
                     val = sum(sen_lens[-ptr:]) - diff
-                    sen_lens = sen_lens[:-ptr] if ptr>1 else sen_lens
+                    sen_lens = sen_lens[:-(ptr-1)] if ptr>1 else sen_lens
                     # substract
                     sen_lens[-1] = val                                       
 
@@ -132,7 +132,6 @@ class RecognizeTextualEntailment:
         all_segment_ids = torch.LongTensor(all_segment_ids)
         all_input_masks = torch.LongTensor(all_input_masks)
         dataset = TensorDataset(all_input_ids, all_segment_ids, all_input_masks)
-        
         
         return dataset
 

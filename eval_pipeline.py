@@ -302,7 +302,6 @@ if __name__ == "__main__":
                             help='"koelectra" if want to use KoElectra model (https://github.com/monologg/KoELECTRA).')
     parent_args = parent_parser.parse_args()
 
-
     # detail options accordingly
     parser = argparse.ArgumentParser(parents = [parent_parser])
     if parent_args.ss_pipeline == 0:                            
