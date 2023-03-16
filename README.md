@@ -1,7 +1,7 @@
-# factcheck-ko-2021
+# factcheck-ko-2023
 
 Based on the project in 2020: https://github.com/ozmig77/factcheck-ko-2020
-
+Based on the project in 2021: https://github.com/hongcheki/factcheck-ko-2021
 
 # Install
 ```
@@ -24,6 +24,7 @@ pip install -r requirements.txt
 
 
 # Training
+
 
 ### Data
 Download the data for training [here](https://drive.google.com/drive/folders/1cYJejZ6gxT7TARy7BtWN77384VgYmjoE?usp=sharing). Save the files in `./data/`

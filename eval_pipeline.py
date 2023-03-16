@@ -52,7 +52,8 @@ from wiki_downloader import make_request
 # baselines for ss, rte model
 from pipeline.ss_org import SentenceSelection
 from pipeline.ss_knn import NewSSDataset, NewSentenceSelection
-from pipeline.rte_org import RecognizeTextualEntailment
+from pipeline.rte import RecognizeTextualEntailment
+
 
 # dr
 # we'll not gonna use the wiki donwloader, rather use the pre-downloaded docs
@@ -159,14 +160,15 @@ def main(args):
         dr_pipeline = SimpleDR(args)
     elif args.dr_pipeline == 2:
         dr_pipeline = SimpleDR2(args)
+
     # 2. ss_pipeline 
     if args.ss_pipeline == 0:
         ss_pipeline = SentenceSelection(args)
     elif args.ss_pipeline == 1:
         ss_pipeline = NewSentenceSelection(args)
+
     # 3. rte_pipeline
-    if args.rte_pipeline == 0:
-        rte_pipeline = RecognizeTextualEntailment(args)
+    rte_pipeline = RecognizeTextualEntailment(args) # args.rte_pipeline 
 
     # make a claim dataset
     with open(os.path.join(args.cwd, 'data/wiki_claims.json'), 'r') as f:
@@ -286,11 +288,20 @@ if __name__ == "__main__":
                         default = 0,
                         type = int,
                         help = "ss pipeline type") #0: original #1: new_ss
-    parent_parser.add_argument("--rte_pipeline",
-                                default = 0,
+    parent_parser.add_argument("--rte_pipeline", #0: original(cls, spe) #1: best(cls, mpe, ev_num 4) #2: (rgs, mpe, ev_num 4, nei_scale 0.45), #3: (rgs, spe, nei_scale 0.45)
+                                default = 1,
                                 type = int,
-                                help = "rte pipline type") #0: original
+                                help = "rte pipline type")
+    parent_parser.add_argument("--rte_cache_dir",
+                            default="./data/models/",
+                            type=str,
+                            help="Where the pre-trained models for RTE will be / is stored")
+    parent_parser.add_argument("--rte_model",
+                            default="koelectra",
+                            type=str,
+                            help='"koelectra" if want to use KoElectra model (https://github.com/monologg/KoELECTRA).')
     parent_args = parent_parser.parse_args()
+
 
     # detail options accordingly
     parser = argparse.ArgumentParser(parents = [parent_parser])
@@ -325,32 +336,28 @@ if __name__ == "__main__":
                             type = int,
                             help = "Batch size for validation examples")
 
-    
-    if parent_args.rte_pipeline == 0:
-        parser.add_argument("--rte_cache_dir",
-                            default="./data/models/",
-                            type=str,
-                            help="Where the pre-trained models for RTE will be / is stored")
-        parser.add_argument("--rte_checkpoints_dir", 
-                            default="./rte/checkpoints/", #./rte/12_04/checkpoints/
-                            type=str,
-                            help="Where checkpoints for RTE will be / is stored.")
-        parser.add_argument("--rte_checkpoint",
-                            default="best_ckpt.pth",
-                            type=str,
-                            help="RTE checkpoint file name.")
-        parser.add_argument("--rte_model",
-                            default="koelectra",
-                            type=str,
-                            help='"koelectra" if want to use KoElectra model (https://github.com/monologg/KoELECTRA).')
+    rte_checkpoints_dirs = ['./rte/checkpoints/', './new_rte/checkpoints/']
+    rte_checkpoints = ['', '_cls_mpe_4', '_rgs_mpe_4', '_rgs_spe']
+    rte_checkpoint_dir = rte_checkpoints_dirs[0] if parent_args.rte_pipeline == 0 else rte_checkpoints_dirs[1]
+    rte_checkpoint = rte_checkpoints[parent_args.rte_pipeline]
+
+    parser.add_argument('--rte_checkpoints_dir',
+                        default = f'{rte_checkpoint_dir}',
+                        type = str,
+                        help='Where checkpoints for RTE will be / is stored.')
+    parser.add_argument('--rte_checkpoint',
+                        default = f'best_ckpt{rte_checkpoint}.pth',
+                        help='RTE checkpoint file name.')
 
     args = parser.parse_args()
 
     args.device = "cuda" if torch.cuda.is_available() else "cpu"
     args.parallel = ~(args.non_parallel)
     args.n_cpu = args.n_cpu if args.parallel else 1
+    #args.max_length = 1024 if args.ss_pipeline == 1 and args.top_k > 7 else 512
     #if args.rte_model == "koelectra":
     #    args.rte_checkpoints_dir = os.path.dirname(args.rte_checkpoints_dir) + "_" + args.rte_model
 
+    print(args.rte_checkpoint)
     main(args)
 

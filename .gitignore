@@ -13,6 +13,9 @@ topic_generalization*
 
 
 rte/checkpoints*
+new_rte_regression/checkpoints*
+new_rte/checkpoint*
+new_rte/tmp*
 
 *.json
 *.pth
@@ -22,6 +25,7 @@ chloe.ipynb
 hs_err_pid72841.log
 README.md
 Visualization.ipynb
+new_notebook.ipynb
 
 .cache*
 
