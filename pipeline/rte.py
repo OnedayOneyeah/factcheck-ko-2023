@@ -162,13 +162,13 @@ class RecognizeTextualEntailment:
 
         else:
             score = logits_cat.mean(dim = 0).item()
-            sf, st = -0.15, 0.15# should be assigned later
+            sf, st = -0.15, 0.1 # should be assigned later # Supported(0) # NEI # Refuted 120
             if score < sf:
                 pred = 1
             elif score >= sf and score < st:
-                pred = 0
-            else:
                 pred = 2
+            else:
+                pred = 0
 
         # if mode == "fever":
         #     if 0 in pred_for_each_claim:

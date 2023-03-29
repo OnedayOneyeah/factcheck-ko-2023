@@ -29,6 +29,7 @@ new_notebook.ipynb
 
 .cache*
 
+.vs_code*
 
 
 __pycache__/

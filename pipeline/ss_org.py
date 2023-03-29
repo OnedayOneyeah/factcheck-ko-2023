@@ -118,6 +118,12 @@ class SentenceSelection:
     def get_results(self, claim, dr_results):
         titles, candidates, ss_dataset = self.build_dataset(claim, dr_results, max_length=512)
         scores, top5_indices = self.validate(ss_dataset)
+        #n_gpu = torch.cuda.device_count()
+        #dist.init_process_group(backend='nccl', init_method="tcp://127.0.0.1:9855", rank=0, world_size=n_gpu)
+        #self.model = DDP(self.model, device_ids = [0])
+        #dist.barrier()
+        #self.validate(ss_dataset)
+
         return (
             scores,
             [titles[idx] for idx in top5_indices],

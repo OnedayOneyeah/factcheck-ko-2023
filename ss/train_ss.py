@@ -156,7 +156,7 @@ def get_data(args, split):
             continue
         existing_titles = [title for title in list(set(dr_results[cid] + titles_annotated)) if title in wiki_titles] 
         # 클레임에 해당하는 document retrieval results 위키 문서들의 타이틀, 혹은 클레임 데이터 자체에 있는 타이틀(1~5)이 wiki_titles 문서 안에 있다면
-        # existing_titlesh로 포함시켜라.
+        # existing_titles로 포함시켜라.
 
         candidates = []
         for title in existing_titles:

@@ -1,8 +1,6 @@
 # load modules
 import os
 from tkinter import ANCHOR
-
-from regex import D
 from eval import DocumentRetrieval
 from tqdm import tqdm
 import time
@@ -14,6 +12,7 @@ from collections import defaultdict
 from functools import partial
 from multiprocessing.pool import ThreadPool
 from multiprocessing.dummy import Pool
+from threading import Thread
 
 # =====from here, for new ss model=====
 import torch.optim as optim
@@ -30,12 +29,6 @@ from transformers.optimization import get_cosine_schedule_with_warmup
 import pickle
 import warnings
 warnings.filterwarnings("ignore")
-
-# ======================================
-# for multi-gpu training
-import torch.distributed as dist
-import torch.multiprocessing as mp
-from torch.nn.parallel import DistributedDataParallel as DDP
 # ======================================
 
 import torch
@@ -69,7 +62,6 @@ from pipeline.rte import RecognizeTextualEntailment
 
 # dr
 # we'll not gonna use the wiki donwloader, rather use the pre-downloaded docs
-
 class SimpleDR:
     def __init__(self, args):
         self.args = args
@@ -109,20 +101,21 @@ class SimpleDR:
     
 
 class SimpleDR2:
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, claim_id, claim_date):
+        #self.args = args
+        self.claim_id = claim_id
+        self.claim_date = claim_date
         with open(os.path.join(os.getcwd(), 'data/wiki/wiki_docs.json'), 'r') as f:
             self.wiki_docs = json.load(f)
         with open(os.path.join(os.getcwd(), 'dr/dr_results.json'), 'r') as f:
             self.dr_results = json.load(f)
 
     def doc_retrieval(self, title):
-
         try: 
             documents = self.wiki_docs[title]
         except:
             return
-        date = datetime.strptime(self.args.claim_date, "%Y-%m-%d %H:%M:%S.%f")
+        date = datetime.strptime(self.claim_date, "%Y-%m-%d %H:%M:%S.%f")
         doc_dates = [datetime.strptime(dt, "%Y-%m-%dT%H:%M:%SZ") for dt in documents.keys()]
         doc_dates = [dt for dt in doc_dates if dt <= date]
         if not doc_dates:
@@ -135,7 +128,7 @@ class SimpleDR2:
 
     def get_dr_results(self, claim):
         self.dr_docs = defaultdict(dict)
-        self.titles = self.dr_results[args.claim_id] # a list     
+        self.titles = self.dr_results[self.claim_id] # a list     
         pool = Pool(processes=6)
         pool.map(self.doc_retrieval, self.titles)
         pool.close()
@@ -144,9 +137,19 @@ class SimpleDR2:
         dr_docs = self.dr_docs
         return dr_docs
         
+def main_worker(params):
+    shared_dic = params[0]
+    shared_dic['']
     
+    claim_id 
+    claim_id = claim_id
+    claim_date = claim_file[claim_id]['Date']
+
+
+
+
 def main(args):
-    label_dict = {0: 'True', 1: 'False', 2: 'NEI'}
+    label_dict = {0: 'True', 1: 'False', 2: 'None'}
 
     # choose pipelines
     # 1. dr_pipeline
@@ -164,13 +167,6 @@ def main(args):
         ss_pipeline = NewSentenceSelection(args)
     elif args.ss_pipeline == 2:
         ss_pipeline = Test(args)
-    
-    top_k = f'_{args.top_k}' if args.ss_pipeline == 1 else ''
-    if os.path.exists(f'ss_{args.ss_pipeline}{top_k}.json'):
-        with open(f'ss_{args.ss_pipeline}{top_k}.json', 'r') as f:
-            ss_file = json.load(f)
-    else:
-         ss = defaultdict(dict)
 
     # 3. rte_pipeline
     rte_pipeline = RecognizeTextualEntailment(args) # args.rte_pipeline 
@@ -182,18 +178,21 @@ def main(args):
         ids = json.load(f)
     
     test_ids = ids['test_ids']
+    claims = [claim_file[i]['claim'] for i in test_ids if i != '6032']
+    labels = [claim_file[i]['True_False'] for i in test_ids if i != '6032']
     total = len(test_ids)
-    correct = 0
+    corrects = 0
     
     # for further analysis
     pd_labels = []
     pbar = tqdm(total=len(test_ids), desc="Iteration")
 
-    for k, i in enumerate(test_ids):
+    for k, i in enumerate(test_ids): # store the test_id and restart there dict: {'ids': ids, 'pd_label': pd_labels}
         if i == '6032':
             continue
-        args.claim = claim_file[i]['claim']
-        args.label = 'NEI' if claim_file[i]['True_False'] == 'None' else claim_file[i]['True_False']
+        claim = claim_file[i]['claim']
+        args.claim = claim
+        args.label = claim_file[i]['True_False']
         if args.dr_pipeline == 1 or args.dr_pipeline == 2:
             args.claim_date = claim_file[i]['Date']
             args.claim_id = i        
@@ -212,18 +211,7 @@ def main(args):
         print(f"DR Time taken: {dr_end - start:0.2f} (sec)")
 
         # SS
-        n_gpu = torch.cuda.device_count()
-        if args.ss_multiproc:
-            mp.spawn(ss_pipeline.get_results, nprocs = n_gpu, args = (args.claim, dr_results))
-        else:
-            if os.path.exists(f'ss_{args.ss_pipeline}{top_k}.json'):
-                ss_scores, ss_titles, ss_results = ss_file[i]['ss_scores'], ss_file[i]['ss_titles'], ss_file[i]['ss_results']
-            else:
-                ss_scores, ss_titles, ss_results = ss_pipeline.get_results(claim = args.claim, dr_results = dr_results)
-                ss[i] = {'ss_scores': [ss_score.item() for ss_score in ss_scores], 
-                'ss_titles': ss_titles, 
-                'ss_results': ss_results}
-        
+        ss_scores, ss_titles, ss_results = ss_pipeline.get_results(claim = args.claim, dr_results = dr_results)
         ss_results_print = "\n".join([
             f"{ss_title}: {ss_result} ({ss_score})"
             for ss_title, ss_result, ss_score
@@ -244,66 +232,35 @@ def main(args):
 
         if args.label:
             if args.label == label_dict[predicted_label]:
-                correct += 1
+                corrects += 1
                 print("\nCorrect!!")
             else:
                 print(f"\nIncorrect!! The correct label is {args.label}")
-            print(f"temp accuracy: {round(correct/(k+1), 5)}")
+            print(f"temp accuracy: {round(corrects/(k+1), 5)}")
         pbar.update(1)
    
    # ================
     print("========== EVAL IS DONE ==========")
-    print(f'test_accuracy: \n{round(correct/total, 5)}')
-
-    # recall/precision
-    lbs = [claim_file[i]['True_False'] for i in test_ids if i != '6032']
-    labels = [0 if i == 'True' else (1 if i == 'False' else 2) for i in lbs]
-    n_corrects_each_label = [0,0,0]
-    n_claims_each_label = [0,0,0]
-    n_predicted_each_label = [0,0,0]
-    for p, l in zip(pd_labels, labels):
-        if p == l:
-            n_corrects_each_label[l] += 1
-        n_claims_each_label[l] += 1
-        n_predicted_each_label[p] += 1
-
-    recall_each_label = np.divide(np.array(n_corrects_each_label), np.array(n_claims_each_label))
-    precision_each_label = np.divide(np.array(n_corrects_each_label), np.array(n_predicted_each_label))
-
-    model_accuracy = {
-        'test_accuracy' : round(correct/total, 5),
-        'recall_each_label' : list(recall_each_label),
-        'precision_each_label' : list(precision_each_label) 
-        }
-
-    print('===== Recall for each Labels =====')
-
-    # rgs_label = ['Refuted', 'NEI', 'Supported']
-    # cls_label = ['Supported', 'Refuted', 'NEI']
-
-    # if args.rte_pipeline in [2,3]:
-    #     labels = rgs_label
-    # else:
-    #     labels = cls_label
-
-    for i, l in enumerate(['Supported', 'Refuted', 'NEI']):
-        print(f'label{i} ({l}): {recall_each_label[i]} ({n_corrects_each_label[i]}/{n_claims_each_label[i]})')
-    print('===== Precision for each Labels =====')
-    for i, l in enumerate(['Supported', 'Refuted', 'NEI']):
-        print(f'label{i} ({l}) : {precision_each_label[i]} ({n_corrects_each_label[i]}/{n_predicted_each_label[i]})')
+    print(f'test_accuracy: \n{round(corrects/total, 5)}')
+    # recall rate / precision rate
     
-    with open(os.path.join(os.getcwd(), f'model_accuracy_{args.ss_pipeline}_{args.rte_pipeline}_{args.remove_noise}{top_k}.json'), 'w') as f:
-        json.dump(model_accuracy, f)
-    if os.path.exists(f'ss_{args.ss_pipeline}{top_k}.json') == False:
-        with open(os.path.join(os.getcwd(), f'ss_{args.ss_pipeline}{top_k}.json'), 'w') as f:
-            json.dump(ss, f)
-    
+    with open(os.path.join(os.getcwd(), f'pd_labels_{args.ss_pipeline}.pkl'), 'wb') as f:
+        pickle.dump(pd_labels, f)
+
 # argument
 
 if __name__ == "__main__":
     print(f"Job is running on {socket.gethostname()}")
 
     parent_parser = argparse.ArgumentParser(add_help = False)
+    parent_parser.add_argument("--claim",
+                        default="한국 최초의 메이저리그 선수인 박찬호는 은퇴 후 돈을 벌기 위해 미국 내셔널리그 샌디에이고 파드리스의 고문이다.",
+                        type=str,
+                        help="claim sentence to verify")
+    parent_parser.add_argument("--label",
+                        default="True",
+                        type=str,
+                        help="gold label, 'True', 'False', or 'NEI'")
     parent_parser.add_argument("--dr_k_wiki",
                         type=int,
                         default=3,
@@ -320,10 +277,6 @@ if __name__ == "__main__":
                         default=None,
                         type=int,
                         help="Number of cpus to utilize for multiprocessing")
-    parent_parser.add_argument("--ss_multiproc",
-                        default = False,
-                        action = "store_true",
-                        help = "Use multiprocessing for sentence selection")
     parent_parser.add_argument("--cwd",
                         default = os.getcwd(),
                         type = str,
@@ -358,9 +311,6 @@ if __name__ == "__main__":
                             default="koelectra",
                             type=str,
                             help='"koelectra" if want to use KoElectra model (https://github.com/monologg/KoELECTRA).')
-    parent_parser.add_argument("--remove_noise",
-                            default = False,
-                            action = "store_true")
     parent_args = parent_parser.parse_args()
 
     # detail options accordingly
@@ -393,11 +343,10 @@ if __name__ == "__main__":
                             default="./data/models/",
                             type=str,
                             help="Where the pre-trained models for SS will be / is stored")
+    #     #parser.add_argument("")
 
     rte_checkpoints_dirs = ['./rte/checkpoints/', './new_rte/checkpoints/']
-    noised_or_not_cls =  '_cls_mpe_4'if parent_args.remove_noise else '_cls_mpe_4_noised' 
-    noised_or_not_rgs = '_rgs_mpe_4' if parent_args.remove_noise else '_rgs_mpe_4_noised'
-    rte_checkpoints = ['', noised_or_not_cls, noised_or_not_rgs, '_rgs_spe']
+    rte_checkpoints = ['', '_cls_mpe_4_noised', '_rgs_mpe_4', '_rgs_spe']
     rte_checkpoint_dir = rte_checkpoints_dirs[0] if parent_args.rte_pipeline == 0 else rte_checkpoints_dirs[1]
     rte_checkpoint = rte_checkpoints[parent_args.rte_pipeline]
 

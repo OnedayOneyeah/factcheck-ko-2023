@@ -10,6 +10,7 @@ from collections import defaultdict
 from unittest.case import DIFF_OMITTED
 import numpy as np
 from tqdm import tqdm
+import datetime
 import torch
 from torch.nn import functional as F
 from torch.utils.data import (
@@ -89,7 +90,55 @@ def cleanse_and_split(text, rm_parens=False):
     return test_lst
 
 
+def add_noise(args):
+    with open(os.path.join(args.input_dir, "wiki_claims.json"), "r") as fp:
+        claims = json.load(fp)
+    with open(os.path.join(args.dr_dir, "dr_results.json"), "r") as fp:
+        dr_results = json.load(fp)
+    with open(os.path.join(args.corpus_dir, "wiki_docs.json"), "r") as fp:
+        wiki = json.load(fp)
+        wiki_titles = wiki.keys()
+
+    noise_dict = defaultdict(dict) # {cid: [candidates]}
+    warnings = defaultdict(dict)
+    
+    for cid in claims:
+        data = claims[cid]
+        titles_annotated = list(set([data[f"title{i}"] for i in range(1, 6) if data[f"title{i}"]]))
+        # if len(titles_annotated) == 0:
+        #         logger.warning(f"claim id {cid} ... No title is annotated. This claim will be Dropped!")
+        #         warnings[cid]["No title"] = []
+        #         continue
+        existing_titles = [title for title in list(set(dr_results[cid] + titles_annotated)) if title in wiki_titles] 
+            # 클레임에 해당하는 document retrieval results 위키 문서들의 타이틀, 혹은 클레임 데이터 자체에 있는 타이틀(1~5)이 wiki_titles 문서 안에 있다면
+            # existing_titles로 포함시켜라.
+        
+        candidates = []
+        for title in existing_titles:
+            documents = wiki[title]
+            date = datetime.datetime.strptime(data["Date"], "%Y-%m-%d %H:%M:%S.%f")
+            doc_dates = [datetime.datetime.strptime(dt, "%Y-%m-%dT%H:%M:%SZ") for dt in documents.keys()]
+            doc_dates = [dt for dt in doc_dates if dt <= date]
+            if not doc_dates:
+                warnings[cid]["Wrong Date"] = {"Date annotated": data["Date"],
+                                               "Dates in downloaded wiki documents": [d.strftime("%Y-%m-%d %H:%M:%S.%f")
+                                                                                      for d in doc_dates]}
+                continue
+            text = documents[max(doc_dates).strftime("%Y-%m-%dT%H:%M:%SZ")] # 가장 최신 문서로 가져와라
+            text_lst = cleanse_and_split(text) # str cleaning 이후, 길이 10인 문장들만 뽑아서 가져옴
+            candidates.extend(text_lst)
+        noise = random.sample(candidates, 1)
+        assert type(noise) == list, candidates
+
+        noise_dict[cid] = noise
+    
+    return noise_dict
+
+    # input: cid / output: a sentence from the retrieved doc
+
+
 def get_dataset(args, split):
+    make_noise = args.add_noise
     logger.info(f"Make {split} dataset")
 
     with open(os.path.join(args.input_dir, "train_val_test_ids.json"), "r") as fp:
@@ -105,6 +154,9 @@ def get_dataset(args, split):
         nei_ss_results = json.load(fp)
         nei_ss_results = {cid: result for cid, result in nei_ss_results.items() if cid in split_ids}
 
+    # add noise #
+    noise_dict = add_noise(args) if make_noise else None
+    # ========= #
     examples = []
     warnings = defaultdict(dict)
     
@@ -130,6 +182,13 @@ def get_dataset(args, split):
 
         else:  # NEI -> use ss results (ss/dir_name/nei_ss_results.json)
             evidences_clean = nei_ss_results[cid][:2]
+
+        # add noise
+        if make_noise:
+            noise = noise_dict[cid]
+            #print(noise)
+            evidences_clean = evidences_clean + noise
+            random.shuffle(evidences_clean)
 
         examples.append({
             'claim': claim,
@@ -187,12 +246,24 @@ def convert_dataset(args, examples, tokenizer, max_length, split, predict=False,
                 )
                 # truncate sentence_b to fit in max_length
                 diff = (len(sentence_a) + len(sentence_b)) - (max_length - 3 - (args.ev_num))
-                sentence_b = sentence_b[:-diff]
+                if args.v2_dataset== 'mpe':
+                    ptr = 1
+                    # locate
+                    while sum(sen_lens[-ptr:]) < diff:
+                        ptr += 1
+                    # pop, if necessary
+                    val = sum(sen_lens[-ptr:]) - diff
+                    sen_lens = sen_lens[::-(ptr-1)] if ptr >1 else sen_lens
+                    sen_lens[-1] = val
+                sentence_a = sentence_a[:-diff]
 
             tokens = ["[CLS]"] + sentence_a + ["[SEP]"] + sentence_b + ["[SEP]"]
             input_ids = tokenizer.convert_tokens_to_ids(tokens)
             # segment_ids = [0] * (len(sentence_a) + 2) + [1] * (len(sentence_b) + 1)
-            segment_ids = [0 if i%2 == 0 else 1 for i,x in enumerate(sen_lens) for y in range(x)] +[(len(sen_lens)+1)%2] + [len(sen_lens)%2]*(len(sentence_b)+1) 
+            if args.v2_dataset == 'mpe':
+                segment_ids = [0 if i%2 == 0 else 1 for i,x in enumerate(sen_lens) for y in range(x)] +[(len(sen_lens)+1)%2] + [len(sen_lens)%2]*(len(sentence_b)+1) 
+            else:
+                segment_ids = [0] * (len(sentence_a)+2) + [1] * (len(sentence_b) + 1)
             mask = [1] * len(input_ids)
 
             # Zero-padding
@@ -237,7 +308,8 @@ def load_or_make_features(args, tokenizer, split, save=True):
     spe_mpe = '_'+args.v2_dataset
     exclude_nei = '_nei_excluded' if args.v3_exclude_nei else ''
     ev_num = '_'+str(args.ev_num) if args.v2_dataset == "mpe" else ''
-    features_path = os.path.join(args.temp_dir, f"{split}_features{small}{rgs_cls}{spe_mpe}{exclude_nei}{ev_num}.pickle")
+    add_noise = '_noised' if args.add_noise else ''
+    features_path = os.path.join(args.temp_dir, f"{split}_features{small}{rgs_cls}{spe_mpe}{exclude_nei}{ev_num}{add_noise}.pickle")
 
     try:
         with open(features_path, "rb") as fp:
@@ -281,7 +353,8 @@ def main_worker(gpu, train_dataset, val_features, args):
         spe_mpe = '_' + args.v2_dataset
         exclude_nei = '_nei_excluded' if args.v3_exclude_nei else ''
         ev_num = '_'+str(args.ev_num) if args.v2_dataset == "mpe" else ''
-        ckpt_path = os.path.join(args.checkpoints_dir, f"best_ckpt{rgs_cls}{spe_mpe}{exclude_nei}{ev_num}.pth")
+        add_noise = '_noised' if args.add_noise else ''
+        ckpt_path = os.path.join(args.checkpoints_dir, f"best_ckpt{rgs_cls}{spe_mpe}{exclude_nei}{ev_num}{add_noise}.pth")
         checkpoint = torch.load(ckpt_path, map_location=f"cuda:{args.gpu}")
         model.module.load_state_dict(checkpoint["state_dict"])
         validate(val_features, model, None, None, args)
@@ -324,7 +397,8 @@ def main_worker(gpu, train_dataset, val_features, args):
         spe_mpe = '_' + args.v2_dataset
         exclude_nei = '_nei_excluded' if args.v3_exclude_nei else ''
         ev_num = '_'+str(args.ev_num) if args.v2_dataset == "mpe" else ''
-        ckpt_path = os.path.join(args.checkpoints_dir, f"best_ckpt{rgs_cls}{spe_mpe}{exclude_nei}{ev_num}.pth")
+        add_noise = '_noised' if args.add_noise else ''
+        ckpt_path = os.path.join(args.checkpoints_dir, f"best_ckpt{rgs_cls}{spe_mpe}{exclude_nei}{ev_num}{add_noise}.pth")
         if os.path.isfile(ckpt_path):
             checkpoint = torch.load(ckpt_path, map_location=f"cuda:{args.gpu}")
             epoch_start = checkpoint["epoch"]
@@ -523,7 +597,8 @@ def validate(val_features, model, optimizer, scheduler, args):
             spe_mpe = '_' + args.v2_dataset
             exclude_nei = '_nei_excluded' if args.v3_exclude_nei else ''
             ev_num = '_'+str(args.ev_num) if args.v2_dataset == "mpe" else ''
-            path = os.path.join(args.checkpoints_dir, f"best_ckpt{rgs_cls}{spe_mpe}{exclude_nei}{ev_num}.pth")
+            add_noise = '_noised' if args.add_noise else ''
+            path = os.path.join(args.checkpoints_dir, f"best_ckpt{rgs_cls}{spe_mpe}{exclude_nei}{ev_num}{add_noise}.pth")
 
             if not args.debug:
                 print(f'===== New Accuracy record! save checkpoint (epoch: {args.epoch + 1})')
@@ -579,6 +654,14 @@ def main():
                         default="./data/",
                         type=str,
                         help="The input data dir.")
+    parser.add_argument("--dr_dir",
+                        default="./dr",
+                        type=str,
+                        help="The results of document retrieval dir.")
+    parser.add_argument("--corpus_dir",
+                        default="./data/wiki/",
+                        type=str,
+                        help="The wikipedia corpus dir.")
     parser.add_argument("--ss_dir",
                         default="./ss/",
                         type=str,
@@ -650,7 +733,7 @@ def main():
     parser.add_argument('--v1_rc',
                         default = 'cls',
                         type = str,
-                        help = 'Regression(rgs) or Classification(cls)')
+                        help = 'Regression(rgs) or Classification(mcls, bcls)')
     parser.add_argument('--v2_dataset',
                         default = 'mpe',
                         type = str,
@@ -667,6 +750,10 @@ def main():
                         default = 4,
                         type = int,
                         help = 'The number of evidence sentences integrated with a claim when building datasets')
+    parser.add_argument('--add_noise',
+                        default = False,
+                        action = 'store_true',
+                        help = "include retrieved sentences in a train and validate processes" )
     args = parser.parse_args()
 
     if args.multiproc_dist:
