@@ -48,7 +48,7 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 - Save additional RTE checkpoints in `new_rte/checkpoints`: [(spe-rgs)](https://drive.google.com/file/d/1Qsd1Aq3daLndqh5r03dc3d3bE1vhsGIr/view?usp=sharing), [(mpe-rgs)](https://drive.google.com/file/d/1Pgf2LHp_IQfyCaViB44O91PAwx4Xdras/view?usp=sharing), [(mpe-cls)](https://drive.google.com/file/d/1QrYEMGfZL0MxkcytREvgB9damWiAAlix/view?usp=sharing)
     
 
-    > **[Descriptions]**
+    > **[Descriptions]**  
         - ***spe***: single premise entailment approach  
         - ***mpe***: multiple premises entailment approach  
         - ***cls***: classifcation model  
@@ -82,7 +82,7 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 
 **1. DR**
 - *The pipelines are loaded from `dr/document_retrieval.py` or `eval_pipeline.py`*
-- `SimpleDR` and `SimpleDR2`reduce time for document retrieval.
+- `SimpleDR` and `SimpleDR2` reduce time for document retrieval.
 
     |Id|Model|Description|
     |---|---|---|
