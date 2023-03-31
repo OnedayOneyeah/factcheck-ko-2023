@@ -38,6 +38,7 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 ### SS/RTE model
 - Documents are available [here](https://github.com/hongcheki/factcheck-ko-2021)
 
+---
 ### Fact-check model
 
 #### Demo
@@ -49,11 +50,13 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 
 3. Test the model with your own claim.
 
+---
 #### Evaluation pipeline
 ```
 python eval_pipeline.py --dr_pipeline <id> --ss_pipeline <id> --rte_pipeline <id>
 ```
 
+---
 #### Model pipelines
 Various combinations can be implemented as followed:
 
@@ -69,6 +72,7 @@ python eval_pipeline.py --dr_pipeline 2 --ss_pipeline 0 --rte_pipeline 2
   |1|SimpleDR|Using pre-retrieved wiki document texts to speed up the DR process|
   |2|SimpleDR2|Using pre-retrieved wiki document titles and texts to speed up the DR process|
 
+
 2. SS
 
   |Id|Model|Description|
@@ -78,7 +82,8 @@ python eval_pipeline.py --dr_pipeline 2 --ss_pipeline 0 --rte_pipeline 2
 
   *The pipelines are loaded from `pipeline/ss_org.py`, `pipeline/ss_knn.py` respectively.*
 
-2. RTE
+
+3. RTE
 - spe: single premise entailment approach
 - mpe: multiple premises entailment approach
 - cls: classifcation model
@@ -92,4 +97,5 @@ python eval_pipeline.py --dr_pipeline 2 --ss_pipeline 0 --rte_pipeline 2
   |3|spe-rgs|54.93|
 
   *The pipelines are loaded from `pipeline/rte.py`*
+  
   *You can remove noise by adding option `--remove_noise`*
