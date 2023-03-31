@@ -1,8 +1,8 @@
 # factcheck-ko-2023
-- Paper is available [here]https://www.notion.so/Fact-check-automation-b40c30af59a9412caff8da59e4e12921
+- Paper is available [here](https://www.notion.so/Fact-check-automation-b40c30af59a9412caff8da59e4e12921)
 
-- Based on the project in 2020: https://github.com/ozmig77/factcheck-ko-2020
-- Based on the project in 2021: https://github.com/hongcheki/factcheck-ko-2021
+- [factcheck-ko-2020](https://github.com/ozmig77/factcheck-ko-2020)
+- [factcheck-ko-2021](https://github.com/hongcheki/factcheck-ko-2021)
 
 ## Leaderboard
 
@@ -38,7 +38,7 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 ### SS/RTE model
 - Documents are available [here](https://github.com/hongcheki/factcheck-ko-2021)
 
-### Evaluate fact-check model
+### Fact-check model
 
 #### Demo
 1. Download the pretrained checkpoints.
@@ -49,21 +49,19 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 
 3. Test the model with your own claim.
 
-#### Evaluation Pipeline
-
-    ```
-    python eval_pipeline.py --dr_pipeline <id> --ss_pipeline <id> --rte_pipeline <id>
-    ```
+#### Evaluation pipeline
+```
+python eval_pipeline.py --dr_pipeline <id> --ss_pipeline <id> --rte_pipeline <id>
+```
 
 #### Model pipelines
 Various combinations can be implemented as followed:
 
-    ```
-    python eval_pipeline.py --dr_pipeline 2 --ss_pipeline 0 --rte_pipeline 2
-    ```
+```
+python eval_pipeline.py --dr_pipeline 2 --ss_pipeline 0 --rte_pipeline 2
+```
 
 1. DR
-
 |Id|Model|Description|
 |---|---|---|
 |0|DocumentRetrieval|Loading wiki document titles and texts by wiki API|
@@ -74,22 +72,23 @@ Various combinations can be implemented as followed:
 
 |Id|Model|Description|
 |---|---|---|
-|0|org|unigram similarity approach|
+|0|org|Unigram similarity approach|
 |1|knn|K-nearest neighbors|
-The pipelines are loaded from `pipeline/ss_org.py`, `pipeline/ss_knn.py` respectively.
+
+*The pipelines are loaded from `pipeline/ss_org.py`, `pipeline/ss_knn.py` respectively.*
 
 2. RTE
-The pipelines are loaded from `pipeline/rte.py`
 - spe: single premise entailment approach
 - mpe: multiple premises entailment approach
 - cls: classifcation model
 - rgs: regression model
 
-|Id|Model|Recall(%)|Description|
+|Id|Model|Recall(%)|
 |---|---|---|
 |0|spe-cls|64.67|
 |1|mpe(noised)-cls|76.79|
 |2|mpe(noised)-rgs|67.60|
 |3|spe-rgs|54.93|
 
+*The pipelines are loaded from `pipeline/rte.py`*
 *You can remove noise by adding option `--remove_noise`*
