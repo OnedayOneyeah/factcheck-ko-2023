@@ -34,8 +34,8 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 - `data/wiki_claims.json`: Human-Annotated Dataset for the Factcheck
 - `data/train_val_test_ids.json`: Lists of claim ids for train/validation/test split
 
-## Train/Evaluate
-### Train/Evaluate SS/RTE model
+## Train/Test
+### SS/RTE model
 - Documents are available [here](https://github.com/hongcheki/factcheck-ko-2021)
 
 ### Evaluate fact-check model
@@ -63,6 +63,7 @@ Various combinations can be implemented as followed:
     ```
 
 1. DR
+
 |Id|Model|Description|
 |---|---|---|
 |0|DocumentRetrieval|Loading wiki document titles and texts by wiki API|
@@ -70,6 +71,7 @@ Various combinations can be implemented as followed:
 |2|SimpleDR2|Using pre-retrieved wiki document titles and texts to speed up the DR process|
 
 2. SS
+
 |Id|Model|Description|
 |---|---|---|
 |0|org|unigram similarity approach|
@@ -84,6 +86,7 @@ The pipelines are loaded from `pipeline/rte.py`
 - rgs: regression model
 
 |Id|Model|Recall(%)|Description|
+|---|---|---|
 |0|spe-cls|64.67|
 |1|mpe(noised)-cls|76.79|
 |2|mpe(noised)-rgs|67.60|
