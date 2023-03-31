@@ -62,20 +62,21 @@ python eval_pipeline.py --dr_pipeline 2 --ss_pipeline 0 --rte_pipeline 2
 ```
 
 1. DR
-|Id|Model|Description|
-|---|---|---|
-|0|DocumentRetrieval|Loading wiki document titles and texts by wiki API|
-|1|SimpleDR|Using pre-retrieved wiki document texts to speed up the DR process|
-|2|SimpleDR2|Using pre-retrieved wiki document titles and texts to speed up the DR process|
+
+  |Id|Model|Description|
+  |---|---|---|
+  |0|DocumentRetrieval|Loading wiki document titles and texts by wiki API|
+  |1|SimpleDR|Using pre-retrieved wiki document texts to speed up the DR process|
+  |2|SimpleDR2|Using pre-retrieved wiki document titles and texts to speed up the DR process|
 
 2. SS
 
-|Id|Model|Description|
-|---|---|---|
-|0|org|Unigram similarity approach|
-|1|knn|K-nearest neighbors|
+  |Id|Model|Description|
+  |---|---|---|
+  |0|org|Unigram similarity approach|
+  |1|knn|K-nearest neighbors|
 
-*The pipelines are loaded from `pipeline/ss_org.py`, `pipeline/ss_knn.py` respectively.*
+  *The pipelines are loaded from `pipeline/ss_org.py`, `pipeline/ss_knn.py` respectively.*
 
 2. RTE
 - spe: single premise entailment approach
@@ -83,12 +84,12 @@ python eval_pipeline.py --dr_pipeline 2 --ss_pipeline 0 --rte_pipeline 2
 - cls: classifcation model
 - rgs: regression model
 
-|Id|Model|Recall(%)|
-|---|---|---|
-|0|spe-cls|64.67|
-|1|mpe(noised)-cls|76.79|
-|2|mpe(noised)-rgs|67.60|
-|3|spe-rgs|54.93|
+  |Id|Model|Recall(%)|
+  |---|---|---|
+  |0|spe-cls|64.67|
+  |1|mpe(noised)-cls|76.79|
+  |2|mpe(noised)-rgs|67.60|
+  |3|spe-rgs|54.93|
 
-*The pipelines are loaded from `pipeline/rte.py`*
-*You can remove noise by adding option `--remove_noise`*
+  *The pipelines are loaded from `pipeline/rte.py`*
+  *You can remove noise by adding option `--remove_noise`*
