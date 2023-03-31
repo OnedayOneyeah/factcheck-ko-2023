@@ -253,7 +253,7 @@ def convert_dataset(args, examples, tokenizer, max_length, split, predict=False,
                         ptr += 1
                     # pop, if necessary
                     val = sum(sen_lens[-ptr:]) - diff
-                    sen_lens = sen_lens[::-(ptr-1)] if ptr >1 else sen_lens
+                    sen_lens = sen_lens[:-(ptr-1)] if ptr >1 else sen_lens
                     sen_lens[-1] = val
                 sentence_a = sentence_a[:-diff]
 

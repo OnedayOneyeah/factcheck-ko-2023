@@ -1,7 +1,23 @@
 # factcheck-ko-2023
+- Paper is available [here]https://www.notion.so/Fact-check-automation-b40c30af59a9412caff8da59e4e12921
 
-Based on the project in 2020: https://github.com/ozmig77/factcheck-ko-2020
-Based on the project in 2021: https://github.com/hongcheki/factcheck-ko-2021
+- Based on the project in 2020: https://github.com/ozmig77/factcheck-ko-2020
+- Based on the project in 2021: https://github.com/hongcheki/factcheck-ko-2021
+
+## Leaderboard
+
+|Rank|Recall(%)|SS|RTE|
+|---|---|---|---|
+|1|60.36|org|mpe(noised)-cls|
+|2(Baseline)|58.72|org|spe-cls|
+|3|56.16|org|mpe(noised)-rgs|
+|4|54.06|org|mpe-rgs|
+|5|52.58|org|spe-rgs|
+|6|50.88|org|mpe-cls|
+|7|48.82|KNN(k=5)|spe-cls|
+|8|43.54|KNN(k=5)|mpe(noised)-cls|
+|9|40.01|KNN(k=5)|mpe(noised)-rgs|
+|10|37.72|KNN(k=5)|mpe-cls|
 
 # Install
 ```
@@ -12,8 +28,19 @@ conda activate factcheck-ko-2021
 pip install -r requirements.txt
 ```
 
+# Data
 
-# Demo
+Download the data for training [here](https://drive.google.com/drive/folders/1cYJejZ6gxT7TARy7BtWN77384VgYmjoE?usp=sharing). Save the files in `./data/`
+- `data/wiki_claims.json`: Human-Annotated Dataset for the Factcheck
+- `data/train_val_test_ids.json`: Lists of claim ids for train/validation/test split
+
+# Train/Evaluate SS/RTE model
+
+- Documents are available [here](https://github.com/hongcheki/factcheck-ko-2021)
+
+# Evaluate fact-check model
+
+## Demo
 1. Download the pretrained checkpoints.
 - Save SS checkpoint [(download)](https://drive.google.com/file/d/1-XuWTl2PKtfrCJMwxwlhq91O9xr86VVp/view?usp=sharing) in `ss/checkpoints`
 - Save RTE checkpint [(download)](https://drive.google.com/file/d/14InhVylKC05i2POo6gGBNXjb9EDp2Nlk/view?usp=sharing) in `rte/checkpoints`.
@@ -22,77 +49,33 @@ pip install -r requirements.txt
 
 3. Test the model with your own claim.
 
+## Evaluation Pipeline
 
-# Training
+    ```
+    python eval_pipeline.py --dr_pipeline <id> --ss_pipeline <id> --rte_pipeline <id>
+    ```
 
+### Model pipelines
+Various combinations can be implemented as followed:
 
-### Data
-Download the data for training [here](https://drive.google.com/drive/folders/1cYJejZ6gxT7TARy7BtWN77384VgYmjoE?usp=sharing). Save the files in `./data/`
-- `data/wiki_claims.json`: Human-Annotated Dataset for the Factcheck
-- `data/train_val_test_ids.json`: Lists of claim ids for train/validation/test split
+    ```
+    python eval_pipeline.py --dr_pipeline 2 --ss_pipeline 0 --rte_pipeline 2
+    ```
 
-### Document Retrieval
+1. DR
+- **0**: [DocumentRetrieval] Loading wiki document titles and texts by wiki API.
+- **1**: [SimpleDR] Using pre-retrieved wiki document texts to speed up the DR process
+- **2**: [SimpleDR2] Using pre-retrieved wiki document titles and texts to speed up the DR process
 
-1. Document retrieval
-    ```
-    python dr/document_retrieval.py --parallel
-    ```
-    This will create `dr/dr_results.json`. **Warning!! It takes a long time.**\
-    _(Our `dr_results.json` is [here](https://drive.google.com/file/d/1QWrYORC3udpgOQ5ZmXzg7fAcHcR3kM7H/view?usp=sharing))_
+2. SS
+- **0**: [org] Trained model by using unigram similarity approach. The pipeline is loaded from `pipeline/ss_org.py`.
+- **1**: [knn] K-nearest neighbors model computing the distance by the inner product of each claim and candidate sentence. The pipeline is loaded from `pipeline/ss_knn.py`
 
-2. Evaluate DR
-    ```
-    python dr/dr_scoring.py --print_samples
-    ```
-    This will print the DR scores and some information to the prompt.\
-    Our result: 84.18% (recall, entire dataset).
+2. RTE
+The pipelines are loaded from `pipeline/rte.py`
+- **0**: [spe-cls] Classification model with datasets formed with single premise entailment(spe) approach. (64.67% accuracy, for test data)
+- **1**: [mpe(noised)-cls] Classificaiton model with datasets formed with multiple premises entailment(mpe) approach. (76.79% accuracy, for test data)
+- **2**: [mpe(noised)-rgs] Regression model with datasets formed with mpe appaorch. (67.60% accuracy, for test data)
+- **3**: [spe-rgs] Regressionmodel with datasets formed with spe approach. (54.93% accuracy, for test data)
 
-### Sentence Selection
-
-1. Download Wikipedia documents\
-    We should download the Wikipedia documents whose titles are retrieved in DR.
-    ```
-    python wiki_downloader.py --parallel
-    ```
-    This will create
-    - `data/wiki/wiki_docs.json`: Wikipedia documents corresponing to claims in `wiki_claims.json`
-    - `data/warnings.json` : Set of data that lacks the integrity. (e.g. Typo in annotated title)
-    - `data/done_list.json` : List of claim ids whose documents are already downloaded. Handling interruptions or errors.
-
-    \
-    **Warning!! It takes more than 70 hours with 50000 claims.**\
-    _(Our `wiki_docs.json` is [here](https://drive.google.com/file/d/1q4cYyLEPGF84-F3ihci9rqXG7eJU9SlL/view?usp=sharing))_
-
-2. Training SS model
-    ```
-    python ss/train_ss.py
-    ```
-    This will create `ss/checkpoints/best_ckpt.pth`.
-
-3. Evaluate SS model with test data
-    ```
-    python ss/train_ss.py --evaluate --test
-    ```
-    Our result: 49.29% (recall with top5 sentence, for test data).
-
-### Recognizing Textual Entailment
-
-1. Get NEI SS results\
-    NEI claims don't have gold evidences, thus we need to feed the RTE model with results of Sentence Selection for NEI claims.
-    ```
-    python ss/get_nei_ss_results.py
-    ```
-    This will create `./ss/nei_ss_results.json`.\
-    _(Our `nei_ss_results.json` is [here](https://drive.google.com/file/d/1t9MkhoqNhRCStBKSIHG1a4rbLYg7f4kG/view?usp=sharing))_
-
-2. Training RTE model
-    ```
-    python rte/train_rte.py
-    ```
-    This will create `rte/checkpoints/best_ckpt.pth`.
-
-3. Evaluate RTE model
-    ```
-    python rte/train_rte.py --evaluate --test
-    ```
-    Our result: 64.67% (accuracy, for test data).
+You can remove noise by adding option `--remove_noise`
