@@ -19,7 +19,7 @@
 |9|40.01|KNN(k=5)|mpe(noised)-rgs|
 |10|37.72|KNN(k=5)|mpe-cls|
 
-# Install
+## Install
 ```
 git clone https://github.com/hongcheki/factcheck-ko-2021.git
 cd factcheck-ko-2021
@@ -28,19 +28,19 @@ conda activate factcheck-ko-2021
 pip install -r requirements.txt
 ```
 
-# Data
+## Data
 
 Download the data for training [here](https://drive.google.com/drive/folders/1cYJejZ6gxT7TARy7BtWN77384VgYmjoE?usp=sharing). Save the files in `./data/`
 - `data/wiki_claims.json`: Human-Annotated Dataset for the Factcheck
 - `data/train_val_test_ids.json`: Lists of claim ids for train/validation/test split
 
-# Train/Evaluate SS/RTE model
-
+## Train/Evaluate
+### Train/Evaluate SS/RTE model
 - Documents are available [here](https://github.com/hongcheki/factcheck-ko-2021)
 
-# Evaluate fact-check model
+### Evaluate fact-check model
 
-## Demo
+#### Demo
 1. Download the pretrained checkpoints.
 - Save SS checkpoint [(download)](https://drive.google.com/file/d/1-XuWTl2PKtfrCJMwxwlhq91O9xr86VVp/view?usp=sharing) in `ss/checkpoints`
 - Save RTE checkpint [(download)](https://drive.google.com/file/d/14InhVylKC05i2POo6gGBNXjb9EDp2Nlk/view?usp=sharing) in `rte/checkpoints`.
@@ -49,13 +49,13 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 
 3. Test the model with your own claim.
 
-## Evaluation Pipeline
+#### Evaluation Pipeline
 
     ```
     python eval_pipeline.py --dr_pipeline <id> --ss_pipeline <id> --rte_pipeline <id>
     ```
 
-### Model pipelines
+#### Model pipelines
 Various combinations can be implemented as followed:
 
     ```
@@ -63,19 +63,30 @@ Various combinations can be implemented as followed:
     ```
 
 1. DR
-- **0**: [DocumentRetrieval] Loading wiki document titles and texts by wiki API.
-- **1**: [SimpleDR] Using pre-retrieved wiki document texts to speed up the DR process
-- **2**: [SimpleDR2] Using pre-retrieved wiki document titles and texts to speed up the DR process
+|Id|Model|Description|
+|---|---|---|
+|0|DocumentRetrieval|Loading wiki document titles and texts by wiki API|
+|1|SimpleDR|Using pre-retrieved wiki document texts to speed up the DR process|
+|2|SimpleDR2|Using pre-retrieved wiki document titles and texts to speed up the DR process|
 
 2. SS
-- **0**: [org] Trained model by using unigram similarity approach. The pipeline is loaded from `pipeline/ss_org.py`.
-- **1**: [knn] K-nearest neighbors model computing the distance by the inner product of each claim and candidate sentence. The pipeline is loaded from `pipeline/ss_knn.py`
+|Id|Model|Description|
+|---|---|---|
+|0|org|unigram similarity approach|
+|1|knn|K-nearest neighbors|
+The pipelines are loaded from `pipeline/ss_org.py`, `pipeline/ss_knn.py` respectively.
 
 2. RTE
 The pipelines are loaded from `pipeline/rte.py`
-- **0**: [spe-cls] Classification model with datasets formed with single premise entailment(spe) approach. (64.67% accuracy, for test data)
-- **1**: [mpe(noised)-cls] Classificaiton model with datasets formed with multiple premises entailment(mpe) approach. (76.79% accuracy, for test data)
-- **2**: [mpe(noised)-rgs] Regression model with datasets formed with mpe appaorch. (67.60% accuracy, for test data)
-- **3**: [spe-rgs] Regressionmodel with datasets formed with spe approach. (54.93% accuracy, for test data)
+- spe: single premise entailment approach
+- mpe: multiple premises entailment approach
+- cls: classifcation model
+- rgs: regression model
 
-You can remove noise by adding option `--remove_noise`
+|Id|Model|Recall(%)|Description|
+|0|spe-cls|64.67|
+|1|mpe(noised)-cls|76.79|
+|2|mpe(noised)-rgs|67.60|
+|3|spe-rgs|54.93|
+
+*You can remove noise by adding option `--remove_noise`*
