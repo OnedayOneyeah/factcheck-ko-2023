@@ -6,7 +6,7 @@
     - [factcheck-ko-2021](https://github.com/hongcheki/factcheck-ko-2021)
     - [factcheck-ko-2020](https://github.com/ozmig77/factcheck-ko-2020)
 
----
+
 ## Leaderboard
 
 |Rank|Recall(%)|SS|RTE
@@ -49,10 +49,10 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
     
 
     > **[Descriptions]**
-        - ***spe***: single premise entailment approach
-        - ***mpe***: multiple premises entailment approach
-        - ***cls***: classifcation model
-        - ***rgs***: regression model
+        - ***spe***: single premise entailment approach  
+        - ***mpe***: multiple premises entailment approach  
+        - ***cls***: classifcation model  
+        - ***rgs***: regression model  
 
 
 ### Fact-check model
@@ -92,7 +92,7 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 
 
 **2. SS**
-- *The pipelines are loaded from `pipeline/ss_org.py` and `pipeline/ss_knn.py` respectively.*
+- *The pipelines are loaded from `pipelines/ss_org.py` and `pipelines/ss_knn.py` respectively.*
 
   |Id|Model|Description|
   |---|---|---|
@@ -101,7 +101,7 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 
 
 **3. RTE**
-- *The pipelines are loaded from `pipeline/rte.py`*
+- *The pipelines are loaded from `pipelines/rte.py`*
 
     |Id|Model|Recall(%)|
     |---|---|---|
