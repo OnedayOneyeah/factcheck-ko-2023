@@ -1,6 +1,6 @@
 # factcheck-ko-2023
 - **Paper**
-    - [Yewon Han (2023)](https://www.notion.so/Fact-check-automation-b40c30af59a9412caff8da59e4e12921)
+    - [Yewon(Chloe) Han (2023)](https://www.notion.so/Fact-check-automation-b40c30af59a9412caff8da59e4e12921)
 
 - **Prior projects**
     - [factcheck-ko-2021](https://github.com/hongcheki/factcheck-ko-2021)
@@ -25,10 +25,10 @@
 ---
 ## Install
 ```
-git clone https://github.com/hongcheki/factcheck-ko-2021.git
-cd factcheck-ko-2021
-conda create -n factcheck-ko-2021 python=3.8
-conda activate factcheck-ko-2021
+git clone https://github.com/OnedayOneyeah/factcheck-ko-2023.git
+cd factcheck-ko-2023
+conda create -n factcheck-ko-2023 python=3.8
+conda activate factcheck-ko-2023
 pip install -r requirements.txt
 ```
 
