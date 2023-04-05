@@ -9,7 +9,7 @@
 
 ## Leaderboard
 
-|Rank|Recall(%)|SS|RTE
+|Rank|Accuracy(%)|SS|RTE
 |---|---|---|---
 |1|60.36|org|MPE(noised)-CLS
 |2|58.72|org|SPE-CLS
@@ -103,7 +103,7 @@ Download the data for training [here](https://drive.google.com/drive/folders/1cY
 **3. RTE**
 - *The pipelines are loaded from `pipelines/rte.py`*
 
-    |Id|Model|Recall(%)|
+    |Id|Model|Accuracy(%)|
     |---|---|---|
     |0|SPE-CLS|64.67|
     |1|MPE(noised)-CLS|76.79|
